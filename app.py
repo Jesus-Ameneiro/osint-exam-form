@@ -161,11 +161,13 @@ def calc_scores():
 
 
 def verdict(pct: int):
+    # Returns: (label, sidebar_text_color, badge_bg, badge_text)
+    # Colors chosen to be legible in both light and dark Streamlit themes
     if pct >= 85:
-        return "APPROVED",           "#0F6E56", "#E1F5EE"
+        return "APPROVED",          "#16a877", "#16a877", "white"
     if pct >= 65:
-        return "CONDITIONAL",        "#854F0B", "#FAEEDA"
-    return     "NEEDS IMPROVEMENT",  "#A32D2D", "#FCEBEB"
+        return "CONDITIONAL",       "#d4890a", "#d4890a", "white"
+    return     "NEEDS IMPROVEMENT", "#e03030", "#e03030", "white"
 
 
 def _do_timer_toggle():
@@ -196,7 +198,7 @@ def build_pdf() -> bytes:
     )
     scored, sec_data = calc_scores()
     pct = round(scored / MAX_PTS * 100) if MAX_PTS else 0
-    vtext, vcol, _ = verdict(pct)
+    vtext, vcol, _, _ = verdict(pct)
     elapsed = get_elapsed()
     hd = st.session_state.header_data
 
@@ -366,15 +368,60 @@ def build_pdf() -> bytes:
 # ─────────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
+/* ── Hide Streamlit chrome ── */
 #MainMenu, footer, header { visibility: hidden; }
-.stApp { background: #f5f5fb; }
-.block-container { padding-top: 1.5rem !important; max-width: 840px !important; }
-[data-testid="stSidebar"] {
-    background: #ffffff;
-    border-right: 1px solid #e8e8f0;
+
+/* ── Layout ── */
+.block-container {
+    padding-top:    1.5rem   !important;
+    padding-bottom: 160px    !important;
+    max-width:      840px    !important;
 }
-/* Give the page room at the bottom so the FAB never covers content */
-.block-container { padding-bottom: 160px !important; }
+
+/* ── Sidebar border only (let Streamlit control the bg color) ── */
+[data-testid="stSidebar"] {
+    border-right: 1px solid rgba(0, 0, 0, 0.08);
+}
+[data-theme="dark"] [data-testid="stSidebar"] {
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ── Header info bar (after Generate Form) ── */
+.osint-header-bar {
+    background:    #EEEDFE;
+    border-left:   4px solid #534AB7;
+    border-radius: 0 10px 10px 0;
+    padding:       10px 16px;
+    font-size:     13px;
+    color:         #2a2060;
+}
+[data-theme="dark"] .osint-header-bar {
+    background: #1e1a3e;
+    color:      #c8c3ff;
+}
+
+/* ── Section card closing footer ── */
+.osint-card-foot {
+    border:        1px solid rgba(0, 0, 0, 0.08);
+    border-top:    none;
+    border-radius: 0 0 14px 14px;
+    height:        10px;
+    background:    rgba(255, 255, 255, 0.5);
+}
+[data-theme="dark"] .osint-card-foot {
+    border-color: rgba(255, 255, 255, 0.08);
+    background:   rgba(0, 0, 0, 0.15);
+}
+
+/* ── Section header divider margin fix ── */
+.osint-sec-header {
+    border-radius: 14px 14px 0 0;
+    padding:       12px 20px;
+    display:       flex;
+    justify-content: space-between;
+    align-items:   center;
+    margin-top:    1.8rem;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -554,7 +601,7 @@ with st.sidebar:
     if st.session_state.form_generated:
         scored, _ = calc_scores()
         pct = round(scored / MAX_PTS * 100)
-        vt, vc, _ = verdict(pct)
+        vt, vc, _, _ = verdict(pct)
         st.metric("Score", f"{scored} / {MAX_PTS}", f"{pct}%")
         st.progress(pct / 100)
         st.markdown(
@@ -635,8 +682,7 @@ else:
     with c_info:
         st.markdown(
             f"""
-            <div style="background:#EEEDFE;border-left:4px solid #534AB7;border-radius:0 10px 10px 0;
-                        padding:10px 16px;font-size:13px;color:#1a1a2e;">
+            <div class="osint-header-bar">
               <b>{hd.get('investigator','')}</b> &nbsp;·&nbsp;
               {hd.get('region','')} &nbsp;·&nbsp;
               Exam #{hd.get('exam_number','')} &nbsp;·&nbsp;
@@ -679,20 +725,12 @@ if st.session_state.form_generated:
         )
         pts_display = "Qualitative" if is_q else f"{sec_scored} / {sec['points']} pts"
 
-        # Colored section header (standalone div — does NOT wrap Streamlit widgets)
+        # Colored section header
         st.markdown(
             f"""
-            <div style="
-                background: {sec['color']};
-                border-radius: 14px 14px 0 0;
-                padding: 12px 20px;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-top: 1.8rem;
-            ">
+            <div class="osint-sec-header" style="background:{sec['color']};">
               <span style="color:white;font-weight:600;font-size:15px;">{sec['title']}</span>
-              <span style="color:rgba(255,255,255,.85);font-size:13px;">{pts_display}</span>
+              <span style="color:rgba(255,255,255,.9);font-size:13px;">{pts_display}</span>
             </div>
             """,
             unsafe_allow_html=True,
@@ -713,7 +751,7 @@ if st.session_state.form_generated:
                     st.session_state.scores[key] = val
                 with cp:
                     if not is_q and it["pts"] > 0:
-                        clr = sec["color"] if val else "#cccccc"
+                        clr = sec["color"] if val else "rgba(128,128,128,0.5)"
                         st.markdown(
                             f'<div style="text-align:right;font-size:11px;font-weight:600;'
                             f'color:{clr};padding-top:6px;">{it["pts"]}pt</div>',
@@ -729,19 +767,14 @@ if st.session_state.form_generated:
             )
             st.session_state.notes[sec["id"]] = note
 
-        # Closing card border
-        st.markdown(
-            """<div style="border:1px solid #e8e8f0;border-top:none;
-                           border-radius:0 0 14px 14px;height:10px;
-                           background:white;"></div>""",
-            unsafe_allow_html=True,
-        )
+        # Closing card border (dark-mode aware via CSS class)
+        st.markdown('<div class="osint-card-foot"></div>', unsafe_allow_html=True)
 
     # ── Final score card ──────────────────────────────────────────────────────
     st.divider()
     scored, _ = calc_scores()
     pct = round(scored / MAX_PTS * 100)
-    vt, vc, vbg = verdict(pct)
+    vt, vc, vbg, vtc = verdict(pct)
     elapsed = get_elapsed()
 
     st.markdown(
@@ -759,9 +792,10 @@ if st.session_state.form_generated:
           <div style="font-size:1.25rem;opacity:.85;margin-top:4px;">{pct}%</div>
           <div style="
               margin-top: 14px; display: inline-block;
-              background: {vbg}; color: {vc};
+              background: {vbg}; color: {vtc};
               padding: 6px 26px; border-radius: 20px;
               font-weight: 600; font-size: 14px;
+              letter-spacing: 0.5px;
           ">{vt}</div>
           <div style="margin-top:10px;opacity:.65;font-size:13px;">⏱ Time used: {fmt_time(elapsed)}</div>
         </div>
